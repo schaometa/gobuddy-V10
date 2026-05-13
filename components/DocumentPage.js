@@ -844,7 +844,7 @@ ${content}
               <el-tag
                 v-for="cat in docCategories"
                 :key="cat.value"
-                :type="activeCategory === cat.value ? '' : 'info'"
+                :type="activeCategory === cat.value ? 'primary' : 'info'"
                 size="small"
                 style="cursor:pointer"
                 @click="activeCategory = cat.value"

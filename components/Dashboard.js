@@ -168,17 +168,8 @@ const Dashboard = {
     };
 
     const filterMeetingDocs = (allDocs, range) => {
-      const filterStart = range.start.clone().subtract(1, 'day');
-      const filterEnd = range.end.clone().add(1, 'day');
-      const dateFiltered = allDocs.filter(d => {
-        const title = d.title || '';
-        const match = title.match(/(\d{4}-\d{2}-\d{2})/);
-        if (!match) return false;
-        const docDate = dayjs(match[1]);
-        return docDate.isAfter(filterStart) && docDate.isBefore(filterEnd);
-      });
       const seen = new Set();
-      return dateFiltered.filter(d => {
+      return allDocs.filter(d => {
         const name = extractMeetingName(d.title || '');
         if (seen.has(name)) return false;
         seen.add(name);
@@ -196,23 +187,19 @@ const Dashboard = {
       const monthStartStr = monthRange.start.format('YYYY-MM-DD') + 'T00:00:00+08:00';
       const monthEndStr = monthRange.end.format('YYYY-MM-DD') + 'T23:59:59+08:00';
 
-      // 搜索本月会议纪要 + 飞书文档
-      const searchQueries = [];
-      searchQueries.push(`会议纪要 ${now.format('YYYY-MM')}`);
-      for (let i = 0; i < now.daysInMonth(); i++) {
-        searchQueries.push(`会议纪要 ${now.startOf('month').clone().add(i, 'day').format('YYYY-MM-DD')}`);
-      }
+      // 搜索会议纪要（不拼接日期，避免搜索无结果）
+      const searchQueries = ['会议纪要', '智能纪要'];
 
       const [taskRes, eventRes, ...searchResults] = await Promise.all([
         WBFeishu.getMyTasks().catch(() => ({ tasks: [] })),
         WBFeishu.getEvents(monthStartStr, monthEndStr).catch(() => ({ events: [] })),
-        ...searchQueries.map(q => WBFeishu.search(q, { size: 10 }).catch(() => ({ items: [] })))
+        ...searchQueries.map(q => WBFeishu.search(q, { size: 20 }).catch(() => ({ items: [] })))
       ]);
 
       const allTasks = taskRes.tasks || [];
       const allEvents = eventRes.events || [];
       const allDocs = searchResults.flatMap(r => r.items || r || []);
-      const meetingOnly = allDocs.filter(d => /^(会议纪要|智能纪要)[：:]/.test(d.title || ''));
+      const meetingOnly = allDocs.filter(d => /^(会议纪要|智能纪要)/.test(d.title || ''));
 
       // 去重并拉取内容
       const allUnique = [];
@@ -238,7 +225,7 @@ const Dashboard = {
       for (const tabId of ['today', 'week', 'month']) {
         const range = getTabRange(tabId);
         const tabTasks = allTasks.filter(t => {
-          if (!t.due) return false;
+          if (!t.due) return true;
           const due = dayjs(t.due);
           return due.isAfter(range.start.subtract(1, 'ms')) && due.isBefore(range.end.add(1, 'ms'));
         });

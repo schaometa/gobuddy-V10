@@ -391,29 +391,6 @@ const ChatPage = {
           </div>
         </div>
       </div>
-
-      <style>
-        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
-        .chat-markdown h1,.chat-markdown h2,.chat-markdown h3 { margin:12px 0 6px; font-weight:600; }
-        .chat-markdown h1 { font-size:18px; } .chat-markdown h2 { font-size:16px; } .chat-markdown h3 { font-size:14px; }
-        .chat-markdown p { margin:6px 0; }
-        .chat-markdown ul,.chat-markdown ol { padding-left:20px; margin:6px 0; }
-        .chat-markdown li { margin:3px 0; }
-        .chat-markdown pre { background:#1E1E1E; color:#D4D4D4; padding:12px; border-radius:6px; overflow-x:auto; margin:8px 0; font-size:13px; }
-        .chat-markdown code { font-family:'Cascadia Code','Fira Code',Consolas,monospace; font-size:13px; }
-        .chat-markdown p code, .chat-markdown li code { background:#F0F1F5; color:#E84393; padding:1px 4px; border-radius:3px; }
-        .chat-markdown blockquote { border-left:3px solid #3370FF; padding-left:12px; color:#555B61; margin:8px 0; }
-        .chat-markdown table { border-collapse:collapse; margin:8px 0; }
-        .chat-markdown th,.chat-markdown td { border:1px solid #E6E8EA; padding:6px 10px; font-size:13px; }
-        .chat-markdown th { background:#F7F8FA; font-weight:600; }
-        .chat-markdown a { color:#3370FF; text-decoration:none; }
-        .chat-markdown a:hover { text-decoration:underline; }
-        .chat-markdown img { max-width:100%; border-radius:6px; }
-        .chat-markdown hr { border:none; border-top:1px solid #E6E8EA; margin:12px 0; }
-        .code-block-wrapper { position:relative; }
-        .copy-code-btn { position:absolute; top:6px; right:6px; background:#555; color:#fff; border:none; padding:3px 8px; border-radius:3px; font-size:11px; cursor:pointer; opacity:0; transition:opacity 0.2s; }
-        .code-block-wrapper:hover .copy-code-btn { opacity:1; }
-      </style>
     </div>
   `
 };

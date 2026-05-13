@@ -40,7 +40,12 @@ const app = express();
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 
-// 静态文件服务
+// 静态文件服务（禁止缓存，确保开发时总是加载最新代码）
+app.use((req, res, next) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  next();
+});
 const staticFiles = ['index.html', 'style.css', 'main.js', 'icon.png'];
 staticFiles.forEach(file => {
   app.get('/' + file, (req, res) => res.sendFile(path.join(getWorkDir(), file)));
@@ -478,7 +483,15 @@ app.get('/api/feishu/calendar/events', async (req, res) => {
     if (endTime) cmd += ` --end "${endTime}"`;
     const result = await runLark(cmd);
     const d = unwrap(result);
-    const events = d.events || d.items || (Array.isArray(d) ? d : []);
+    const rawEvents = d.events || d.items || (Array.isArray(d) ? d : []);
+    // 转换事件格式：start_time/end_time 从对象 {datetime, timezone} 转为字符串
+    const events = rawEvents.map(e => ({
+      ...e,
+      start_time: typeof e.start_time === 'object' ? e.start_time?.datetime : e.start_time,
+      end_time: typeof e.end_time === 'object' ? e.end_time?.datetime : e.end_time,
+      startTime: typeof e.start_time === 'object' ? e.start_time?.datetime : (e.start_time || e.startTime),
+      endTime: typeof e.end_time === 'object' ? e.end_time?.datetime : (e.end_time || e.endTime),
+    }));
     res.json({ events });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -531,8 +544,25 @@ app.get('/api/feishu/search', async (req, res) => {
     if (size) cmd += ` --page-size ${size}`;
     const result = await runLark(cmd);
     const d = unwrap(result);
-    // 前端期望 items 字段，lark-cli 返回 results
-    if (d.results && !d.items) d.items = d.results;
+    // 转换搜索结果格式：lark-cli 返回 results，前端期望 items
+    if (d.results && !d.items) {
+      d.items = d.results.map(r => {
+        const meta = r.result_meta || {};
+        // 去掉 title_highlighted 中的 HTML 高亮标签
+        const title = (r.title_highlighted || '').replace(/<\/?[^>]+>/g, '');
+        return {
+          title,
+          token: meta.token || '',
+          url: meta.url || '',
+          doc_types: meta.doc_types || '',
+          edit_user_name: meta.edit_user_name || '',
+          update_time: meta.update_time_iso || '',
+          summary: (r.summary_highlighted || '').replace(/<\/?[^>]+>/g, ''),
+          ...meta
+        };
+      });
+      delete d.results;
+    }
     res.json(d);
   } catch (e) {
     res.status(500).json({ error: e.message });

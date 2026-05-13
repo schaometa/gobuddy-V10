@@ -930,7 +930,7 @@ const TablePage = {
       <el-dialog v-model="showProcessDialog" title="" width="480px"><template #title><i data-lucide="wrench" style="width:16px;height:16px"></i> AI智能处理</template>
         <div style="margin-bottom:12px">
           <div style="font-size:14px;color:#555B61;margin-bottom:8px">告诉AI你想对表格做什么处理：</div>
-          <el-input v-model="processInstruction" type="textarea" :rows="3" placeholder="例如：&#10;- 按销售额从高到低排序&#10;- 添加一列"总计"计算单价*数量&#10;- 筛选出状态为"进行中"的行" />
+          <el-input v-model="processInstruction" type="textarea" :rows="3" placeholder="例如：按销售额排序、添加总计列、筛选进行中的行" />
         </div>
         <div style="font-size:12px;color:#888D92"><i data-lucide="lightbulb" style="width:14px;height:14px"></i> 处理结果将直接写回飞书表格</div>
         <template #footer>

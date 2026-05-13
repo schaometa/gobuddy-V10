@@ -29,12 +29,12 @@ const MessagePage = {
       }
     });
 
-    // 过滤后的任务（客户端按 due 过滤）
+    // 过滤后的任务（无 due 的任务也显示）
     const filteredTasks = computed(() => {
       const s = dateRange.value.start.clone().subtract(1, 'ms');
       const e = dateRange.value.end.clone().add(1, 'ms');
       return tasks.value.filter(t => {
-        if (!t.due) return false;
+        if (!t.due) return true; // 无截止日期的任务也显示
         const due = dayjs(t.due);
         return due.isAfter(s) && due.isBefore(e);
       });
@@ -111,19 +111,10 @@ const MessagePage = {
       }
     };
 
-    // 按日期范围过滤会议文档
+    // 会议文档去重（搜索结果已经相关，不做日期过滤）
     const filterMeetingDocs = (allDocs, range) => {
-      const filterStart = range.start.clone().subtract(1, 'day');
-      const filterEnd = range.end.clone().add(1, 'day');
-      const dateFiltered = allDocs.filter(d => {
-        const title = d.title || '';
-        const match = title.match(/(\d{4}-\d{2}-\d{2})/);
-        if (!match) return false;
-        const docDate = dayjs(match[1]);
-        return docDate.isAfter(filterStart) && docDate.isBefore(filterEnd);
-      });
       const seen = new Set();
-      return dateFiltered.filter(d => {
+      return allDocs.filter(d => {
         const name = extractMeetingName(d.title || '');
         if (seen.has(name)) return false;
         seen.add(name);
@@ -132,7 +123,9 @@ const MessagePage = {
     };
 
     const syncFeishu = async () => {
+      console.log('[同步] 开始同步飞书数据...');
       if (!feishuConnected.value) {
+        console.log('[同步] 飞书未连接，中止');
         ElementPlus.ElMessage.error('飞书未连接，请先启动 server.js 并登录飞书');
         return;
       }
@@ -147,16 +140,8 @@ const MessagePage = {
         const monthStartStr = monthRange.start.format('YYYY-MM-DD') + 'T00:00:00+08:00';
         const monthEndStr = monthRange.end.format('YYYY-MM-DD') + 'T23:59:59+08:00';
 
-        // 生成搜索查询（会议纪要 + 智能纪要）
-        const searchQueries = [];
-        const monthStr = now.format('YYYY-MM');
-        searchQueries.push(`会议纪要 ${monthStr}`);
-        searchQueries.push(`智能纪要 ${monthStr}`);
-        for (let i = 0; i < now.daysInMonth(); i++) {
-          const d = now.startOf('month').clone().add(i, 'day').format('YYYY-MM-DD');
-          searchQueries.push(`会议纪要 ${d}`);
-          searchQueries.push(`智能纪要 ${d}`);
-        }
+        // 搜索会议纪要（不拼接日期，避免搜索无结果）
+        const searchQueries = ['会议纪要', '智能纪要'];
 
         // 并行获取：任务 + 月度日程 + 多路搜索会议纪要
         const [taskRes, eventRes, ...searchResults] = await Promise.all([
@@ -168,9 +153,13 @@ const MessagePage = {
         const allTasks = taskRes.tasks || [];
         const allEvents = eventRes.events || [];
 
+        console.log('[同步] 任务:', allTasks.length, '条, 日程:', allEvents.length, '条');
+        console.log('[同步] 搜索结果:', searchResults.map(r => (r.items || []).length));
+
         // 合并搜索结果并过滤
         const allDocs = searchResults.flatMap(r => r.items || r || []);
-        const meetingOnly = allDocs.filter(d => /^(会议纪要|智能纪要)[：:]/.test(d.title || ''));
+        const meetingOnly = allDocs.filter(d => /^(会议纪要|智能纪要)/.test(d.title || ''));
+        console.log('[同步] 会议纪要匹配:', meetingOnly.length, '条');
 
         // 拉取所有会议文档内容（只拉一次，三个 Tab 共用）
         const allUnique = [];
@@ -202,7 +191,7 @@ const MessagePage = {
 
           // 按日期过滤任务
           const tabTasks = allTasks.filter(t => {
-            if (!t.due) return false;
+            if (!t.due) return true; // 无截止日期的任务也保留
             const due = dayjs(t.due);
             return due.isAfter(range.start.subtract(1, 'ms')) && due.isBefore(range.end.add(1, 'ms'));
           });
@@ -231,6 +220,8 @@ const MessagePage = {
 
         // 加载当前 Tab 的数据到视图
         loadData(activeTab.value);
+        console.log('[同步] 完成! 当前Tab:', activeTab.value);
+        console.log('[同步] tasks:', tasks.value.length, 'events:', events.value.length, 'meetingDocs:', meetingDocs.value.length);
         ElementPlus.ElMessage.success('同步完成（今日/本周/本月已全部更新）');
       } catch (e) {
         ElementPlus.ElMessage.error('同步失败：' + e.message);
@@ -333,10 +324,15 @@ const MessagePage = {
     onMounted(async () => {
       loadData(activeTab.value);
       await checkFeishu();
+      // 首次加载：尝试从缓存读取，无缓存则自动同步
+      const hasCache = loadData(activeTab.value);
+      if (!hasCache && feishuConnected.value) {
+        await syncFeishu();
+      }
       nextTick(() => { if (typeof lucide !== 'undefined') lucide.createIcons(); });
     });
 
-    // 监听工作看板刷新事件，自动加载最新数据
+    // 监听工作看板刷新事件，重新加载缓存数据
     window.addEventListener('dashboard-refreshed', () => {
       loadData(activeTab.value);
     });
