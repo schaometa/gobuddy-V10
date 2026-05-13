@@ -1,0 +1,65 @@
+{
+  "name": "gobuddy",
+  "version": "1.0.0",
+  "description": "GoBuddy - 个人工作助理",
+  "author": "GoBuddy",
+  "main": "main-electron.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "build:dir": "electron-builder --dir",
+    "build:win": "electron-builder --win"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.18.2"
+  },
+  "devDependencies": {
+    "electron": "28.3.3",
+    "electron-builder": "^26.0.0"
+  },
+  "build": {
+    "appId": "com.gobuddy.app",
+    "productName": "GoBuddy",
+    "forceCodeSigning": false,
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main-electron.js",
+      "preload.js",
+      "server.js",
+      "index.html",
+      "style.css",
+      "main.js",
+      "components/**",
+      "services/**",
+      "scripts/**",
+      "node_modules/**",
+      "!node_modules/**/test/**",
+      "!node_modules/**/*.md",
+      "!node_modules/**/LICENSE"
+    ],
+    "asarUnpack": [
+      "index.html",
+      "style.css",
+      "main.js",
+      "components/**",
+      "services/**",
+      "scripts/**"
+    ],
+    "win": {
+      "target": "nsis",
+      "signAndEditExecutable": false,
+      "icon": null
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "GoBuddy",
+      "include": "scripts/installer-check.nsh"
+    }
+  }
+}

@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Temporary
+*.tmp
+*.temp
+.tmp/
+.mcp.json
+
+# Claude Code
+.agents/
+.claude/
+skills-lock.json
+
+# Documentation
+doc/
+
+# Build output
+dist/

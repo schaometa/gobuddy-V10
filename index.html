@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GoBuddy - 个人工作助理</title>
+
+  <!-- Inter Font (Feishu/Lark) -->
+  <style>
+    @font-face {
+      font-family: 'Inter';
+      font-style: normal;
+      font-weight: 400;
+      font-display: swap;
+      src: url('https://sf6-cdn-tos.douyinstatic.com/obj/eden-cn/slepweh7nupqpognuhbo/Inter-Regular.ttf') format('truetype');
+    }
+    @font-face {
+      font-family: 'Inter';
+      font-style: normal;
+      font-weight: 500;
+      font-display: swap;
+      src: url('https://sf6-cdn-tos.douyinstatic.com/obj/eden-cn/slepweh7nupqpognuhbo/Inter-Medium.ttf') format('truetype');
+    }
+    @font-face {
+      font-family: 'Inter';
+      font-style: normal;
+      font-weight: 600;
+      font-display: swap;
+      src: url('https://sf6-cdn-tos.douyinstatic.com/obj/eden-cn/slepweh7nupqpognuhbo/Inter-SemiBold.ttf') format('truetype');
+    }
+    @font-face {
+      font-family: 'Inter';
+      font-style: normal;
+      font-weight: 700;
+      font-display: swap;
+      src: url('https://sf6-cdn-tos.douyinstatic.com/obj/eden-cn/slepweh7nupqpognuhbo/Inter-Bold.ttf') format('truetype');
+    }
+  </style>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Vue 3 -->
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+
+  <!-- Element Plus -->
+  <link rel="stylesheet" href="https://unpkg.com/element-plus/dist/index.css" />
+  <script src="https://unpkg.com/element-plus"></script>
+
+  <!-- Element Plus Icons -->
+  <script src="https://unpkg.com/@element-plus/icons-vue"></script>
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- dayjs -->
+  <script src="https://unpkg.com/dayjs/dayjs.min.js"></script>
+
+  <!-- Dexie.js (IndexedDB) -->
+  <script src="https://unpkg.com/dexie/dist/dexie.js"></script>
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- marked.js -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+  <!-- SheetJS for Excel export -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+
+  <!-- wangEditor Rich Text Editor -->
+  <link href="https://unpkg.com/@wangeditor/editor@5.1.23/dist/css/style.css" rel="stylesheet">
+  <script src="https://unpkg.com/@wangeditor/editor@5.1.23/dist/index.js"></script>
+
+  <link rel="stylesheet" href="style.css?v=4" />
+</head>
+<body>
+  <div id="app"></div>
+
+  <script src="services/storage.js?v=2"></script>
+  <script src="services/ai.js?v=2"></script>
+  <script src="services/feishu.js?v=4"></script>
+  <script src="services/notification.js"></script>
+  <script src="services/export.js"></script>
+  <script src="components/Sidebar.js"></script>
+  <script src="components/TopNav.js"></script>
+  <script src="components/SettingsModal.js"></script>
+  <script src="components/QuickNote.js"></script>
+  <script src="components/Dashboard.js"></script>
+  <script src="components/DocumentPage.js"></script>
+  <script src="components/TablePage.js"></script>
+  <script src="components/MessagePage.js?v=18"></script>
+  <script src="components/ChatPage.js"></script>
+  <script src="main.js"></script>
+</body>
+</html>

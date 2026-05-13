@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>{{title}}</title>
+    <style>
+        :root {
+            --bg-color: #ffffff;
+            --text-color: #1f2937;
+            --accent-color: #3b82f6;
+            --secondary-bg: #f0f9ff;
+            --heading-color: #111827;
+            --nav-bg: rgba(255,255,255,0.9);
+        }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background: var(--bg-color);
+            color: var(--text-color);
+            overflow: hidden;
+            height: 100vh;
+        }
+        .slides-container {
+            height: 100%;
+            width: 100%;
+            position: relative;
+        }
+        .slide {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.4s ease, visibility 0.4s;
+            overflow-y: auto;
+            padding: 3rem 4rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        .slide.active {
+            opacity: 1;
+            visibility: visible;
+        }
+        h1 {
+            font-size: 3.5rem;
+            margin-bottom: 1rem;
+            color: var(--heading-color);
+            font-weight: 700;
+        }
+        h2 {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            color: var(--heading-color);
+            border-left: 5px solid var(--accent-color);
+            padding-left: 1rem;
+        }
+        h3 {
+            font-size: 1.8rem;
+            margin-bottom: 0.75rem;
+            color: var(--heading-color);
+        }
+        p, li {
+            font-size: 1.25rem;
+            line-height: 1.5;
+            margin-bottom: 0.5rem;
+        }
+        ul, ol {
+            margin: 1rem 0 1rem 2rem;
+        }
+        .big-text {
+            font-size: 2rem;
+            font-weight: 500;
+        }
+        .golden {
+            text-align: center;
+            font-size: 3rem;
+            font-weight: bold;
+            color: var(--accent-color);
+        }
+        .nav-btn {
+            position: fixed;
+            top: 50%;
+            transform: translateY(-50%);
+            background: var(--nav-bg);
+            border: none;
+            font-size: 2rem;
+            cursor: pointer;
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            backdrop-filter: blur(4px);
+            z-index: 100;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            transition: transform 0.2s;
+        }
+        .nav-btn:hover {
+            transform: translateY(-50%) scale(1.05);
+        }
+        .prev {
+            left: 1rem;
+        }
+        .next {
+            right: 1rem;
+        }
+        .page-indicator {
+            position: fixed;
+            bottom: 1rem;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.6);
+            color: white;
+            padding: 0.3rem 0.8rem;
+            border-radius: 2rem;
+            font-size: 0.9rem;
+            z-index: 100;
+            font-family: monospace;
+        }
+        @media (max-width: 768px) {
+            .slide {
+                padding: 2rem 1.5rem;
+            }
+            h1 {
+                font-size: 2rem;
+            }
+            h2 {
+                font-size: 1.8rem;
+            }
+            p, li {
+                font-size: 1rem;
+            }
+            .golden {
+                font-size: 2rem;
+            }
+            .nav-btn {
+                font-size: 1.5rem;
+                padding: 0.3rem 0.8rem;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="slides-container" id="slidesContainer">
+    <!-- 幻灯片内容将由生成器填充 -->
+</div>
+<button class="nav-btn prev" id="prevBtn">❮</button>
+<button class="nav-btn next" id="nextBtn">❯</button>
+<div class="page-indicator" id="pageIndicator">1 / 1</div>
+<script>
+    // 翻页逻辑（示例）
+    let currentSlide = 0;
+    const slides = document.querySelectorAll('.slide');
+    const totalSlides = slides.length;
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+    const indicator = document.getElementById('pageIndicator');
+
+    function updateSlides() {
+        slides.forEach((slide, idx) => {
+            if (idx === currentSlide) {
+                slide.classList.add('active');
+            } else {
+                slide.classList.remove('active');
+            }
+        });
+        indicator.innerText = `${currentSlide + 1} / ${totalSlides}`;
+    }
+
+    function nextSlide() {
+        if (currentSlide < totalSlides - 1) {
+            currentSlide++;
+            updateSlides();
+        }
+    }
+
+    function prevSlide() {
+        if (currentSlide > 0) {
+            currentSlide--;
+            updateSlides();
+        }
+    }
+
+    prevBtn.addEventListener('click', prevSlide);
+    nextBtn.addEventListener('click', nextSlide);
+
+    window.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowLeft') prevSlide();
+        if (e.key === 'ArrowRight') nextSlide();
+    });
+
+    // 触摸滑动支持
+    let touchStartX = 0;
+    document.body.addEventListener('touchstart', (e) => {
+        touchStartX = e.changedTouches[0].screenX;
+    });
+    document.body.addEventListener('touchend', (e) => {
+        const endX = e.changedTouches[0].screenX;
+        if (endX < touchStartX - 50) nextSlide();
+        if (endX > touchStartX + 50) prevSlide();
+    });
+</script>
+</body>
+</html>
