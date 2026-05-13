@@ -74,7 +74,6 @@ const WBStorage = {
           'moonshot-v1-32k': { name: 'Moonshot V1 32K' }
         }
       }
-      }
     });
   },
 
