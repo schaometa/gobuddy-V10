@@ -84,6 +84,29 @@ async function createWindow() {
     // 依赖检查脚本加载失败时继续尝试启动
   }
 
+  // ===== 自动清理被占用的端口 =====
+  showLoadingPage('正在检查端口...');
+  try {
+    const { execSync } = require('child_process');
+    const checkCmd = process.platform === 'win32'
+      ? `netstat -ano | findstr :${PORT} | findstr LISTENING`
+      : `lsof -i :${PORT} -t`;
+    const output = execSync(checkCmd, { encoding: 'utf-8', windowsHide: true }).trim();
+    if (output) {
+      const pids = process.platform === 'win32'
+        ? [...new Set(output.split('\n').map(l => l.trim().split(/\s+/).pop()).filter(Boolean))]
+        : output.split('\n').map(l => l.trim()).filter(Boolean);
+      for (const pid of pids) {
+        try {
+          process.kill(parseInt(pid), 'SIGTERM');
+          console.log('[GoBuddy] 已终止占用端口的进程:', pid);
+        } catch {}
+      }
+      // 等待端口释放
+      await new Promise(r => setTimeout(r, 1000));
+    }
+  } catch {}
+
   // ===== 启动 Express 服务器 =====
   showLoadingPage('正在启动服务...');
   try {
@@ -92,7 +115,7 @@ async function createWindow() {
   } catch (e) {
     showErrorPage('启动失败',
       e.message.includes('EADDRINUSE')
-        ? '端口 ' + PORT + ' 已被占用，请关闭占用该端口的程序后重试。'
+        ? '端口 ' + PORT + ' 仍被占用，请手动关闭占用该端口的程序后重试。'
         : e.message
     );
     return;
