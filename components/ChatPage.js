@@ -143,7 +143,18 @@ const ChatPage = {
         search_feishu_docs: '搜索飞书文档',
         get_feishu_tasks: '获取待办任务',
         create_feishu_task: '创建待办任务',
-        get_calendar_events: '获取日程'
+        get_calendar_events: '获取日程',
+        read_feishu_doc: '读取飞书文档',
+        read_feishu_sheet: '读取表格数据',
+        get_sheet_tabs: '获取工作表列表',
+        get_dashboard_stats: '获取看板统计',
+        get_recent_docs: '获取最近文档',
+        get_recent_tables: '获取最近表格',
+        get_meeting_notes: '获取会议纪要',
+        update_feishu_doc: '编辑飞书文档',
+        write_feishu_sheet: '写入表格数据',
+        complete_feishu_task: '完成待办任务',
+        create_calendar_event: '创建日程'
       };
 
       // 流式调用
