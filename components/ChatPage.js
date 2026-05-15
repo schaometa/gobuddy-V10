@@ -10,7 +10,7 @@ const ChatPage = {
     const currentMessages = ref([]);
     const streaming = ref(false);
     const inputText = ref('');
-    const messagesEndRef = ref(null);
+    const abortController = ref(null);
 
     // 模型选择
     const providers = ref({});
@@ -89,6 +89,21 @@ const ChatPage = {
       if (el) el.scrollIntoView({ behavior: 'smooth' });
     };
 
+    // 停止生成
+    const stopStreaming = () => {
+      if (abortController.value) {
+        abortController.value.abort();
+        abortController.value = null;
+      }
+      streaming.value = false;
+      // 移除空的 AI 占位消息
+      const lastMsg = currentMessages.value[currentMessages.value.length - 1];
+      if (lastMsg && lastMsg.role === 'assistant' && !lastMsg.content) {
+        currentMessages.value.pop();
+      }
+      saveCurrentConversation();
+    };
+
     // 发送消息
     const sendMessage = async () => {
       const text = inputText.value.trim();
@@ -111,6 +126,8 @@ const ChatPage = {
       });
 
       streaming.value = true;
+      const controller = new AbortController();
+      abortController.value = controller;
       nextTick(scrollToBottom);
 
       // 构建上下文消息（包含工具调用历史，转换为 OpenAI 格式）
@@ -125,11 +142,17 @@ const ChatPage = {
             content: null,
             tool_calls: [{ id: m.toolId, type: 'function', function: { name: m.toolName, arguments: JSON.stringify(m.args || {}) } }]
           };
-          if (m.role === 'tool_result') return {
-            role: 'tool',
-            tool_call_id: m.toolId,
-            content: typeof m.result === 'string' ? m.result : JSON.stringify(m.result)
-          };
+          if (m.role === 'tool_result') {
+            let resultStr = typeof m.result === 'string' ? m.result : JSON.stringify(m.result);
+            if (resultStr.length > 3000) {
+              resultStr = resultStr.substring(0, 3000) + '\n... (结果过长已截断)';
+            }
+            return {
+              role: 'tool',
+              tool_call_id: m.toolId,
+              content: resultStr
+            };
+          }
           return null;
         })
         .filter(Boolean);
@@ -159,6 +182,7 @@ const ChatPage = {
 
       // 流式调用
       await WBAI.streamChat(contextMessages, {
+        abortSignal: controller.signal,
         onChunk: (content) => {
           const lastMsg = currentMessages.value[currentMessages.value.length - 1];
           if (lastMsg && lastMsg.role === 'assistant') {
@@ -178,12 +202,27 @@ const ChatPage = {
           nextTick(scrollToBottom);
         },
         onToolResult: (tr) => {
+          const toolResult = tr.result || {};
+          let summary = '';
+          if (tr.name === 'read_feishu_doc') summary = (toolResult.content || toolResult.markdown || '').substring(0, 200) + '...';
+          else if (tr.name === 'read_feishu_sheet') summary = `${(toolResult.values || []).length} 行数据`;
+          else if (tr.name === 'get_meeting_notes') summary = `${(toolResult.notes || []).length} 篇会议纪要`;
+          else if (tr.name === 'get_feishu_tasks') summary = `${(toolResult.tasks || []).length} 个任务`;
+          else if (tr.name === 'get_calendar_events') summary = `${(toolResult.events || []).length} 个日程`;
+          else if (tr.name === 'search_feishu_docs') summary = `${(toolResult.items || []).length} 条结果`;
+          else if (tr.name === 'create_feishu_doc') summary = `文档已创建: ${toolResult.url || toolResult.token || ''}`;
+          else if (tr.name === 'create_feishu_sheet') summary = `表格已创建: ${toolResult.url || toolResult.spreadsheetToken || ''}`;
+          else if (tr.name === 'create_feishu_task') summary = `任务已创建: ${toolResult.guid || ''}`;
+          else if (tr.name === 'complete_feishu_task') summary = '任务已完成';
+          else summary = JSON.stringify(toolResult).substring(0, 150);
+
           currentMessages.value.push({
             role: 'tool_result',
             toolId: tr.id,
             toolName: tr.name,
             toolLabel: toolNameMap[tr.name] || tr.name,
             result: tr.result,
+            resultSummary: summary,
             timestamp: new Date().toISOString()
           });
 
@@ -206,7 +245,6 @@ const ChatPage = {
             if (recentTables.length > 20) recentTables.pop();
             WBStorage.set('recent-feishu-tables', recentTables);
           }
-          // 通知其他模块刷新
           window.dispatchEvent(new CustomEvent('dashboard-refreshed'));
           window.dispatchEvent(new CustomEvent('feishu-connected'));
 
@@ -220,10 +258,13 @@ const ChatPage = {
         },
         onDone: async () => {
           streaming.value = false;
+          abortController.value = null;
           await saveCurrentConversation();
         },
         onError: (err) => {
+          if (err.name === 'AbortError') return; // 用户主动停止
           streaming.value = false;
+          abortController.value = null;
           const lastMsg = currentMessages.value[currentMessages.value.length - 1];
           if (lastMsg && lastMsg.role === 'assistant') {
             lastMsg.content = lastMsg.content || `错误：${WBAI.getErrorMessage(err)}`;
@@ -272,12 +313,6 @@ const ChatPage = {
       }
     };
 
-    // 渲染后添加代码块复制按钮
-    const wrapCodeBlocks = (html) => {
-      return html.replace(/<pre><code/g, '<div class="code-block-wrapper"><pre><code')
-                 .replace(/<\/code><\/pre>/g, '</code></pre><button class="copy-code-btn" onclick="document.querySelector(&#39;chat-page&#39;).__vue_app__.$root._instance.ctx.copyCode?.(event) || (event.target.closest(&#39;.code-block-wrapper&#39;).querySelector(&#39;code&#39;) && navigator.clipboard.writeText(event.target.closest(&#39;.code-block-wrapper&#39;).querySelector(&#39;code&#39;).textContent))">复制</button></div>');
-    };
-
     onMounted(() => {
       loadConversations();
       loadProviders();
@@ -287,14 +322,14 @@ const ChatPage = {
       conversations, currentConvId, currentMessages, streaming, inputText,
       providers, activeProvider, activeModel, modelList,
       newConversation, openConversation, deleteConversation,
-      sendMessage, renderMarkdown, formatTime, formatListTime, copyCode, wrapCodeBlocks
+      sendMessage, stopStreaming, renderMarkdown, formatTime, formatListTime, copyCode
     };
   },
   template: `
     <div style="display:flex;height:calc(100vh - 60px);overflow:hidden">
       <!-- 左侧对话列表 -->
-      <div style="width:240px;min-width:240px;border-right:1px solid #E6E8EA;display:flex;flex-direction:column;background:#FAFBFC">
-        <div style="padding:12px;border-bottom:1px solid #E6E8EA">
+      <div style="width:240px;min-width:240px;border-right:1px solid #E6E8EA;display:flex;flex-direction:column;background:#FAFBFC;overflow:hidden">
+        <div style="padding:12px;border-bottom:1px solid #E6E8EA;flex-shrink:0">
           <el-button type="primary" style="width:100%" @click="newConversation">
             <i data-lucide="plus" style="width:14px;height:14px;margin-right:4px"></i> 新对话
           </el-button>
@@ -304,8 +339,8 @@ const ChatPage = {
             @click="openConversation(conv.id)"
             style="padding:10px 12px;border-radius:6px;cursor:pointer;margin-bottom:4px;display:flex;align-items:center;justify-content:space-between;transition:background 0.2s"
             :style="{ background: currentConvId === conv.id ? '#E8F0FE' : 'transparent' }"
-            @mouseenter="$event.target.style.background=currentConvId===conv.id?'#E8F0FE':'#F0F1F5'"
-            @mouseleave="$event.target.style.background=currentConvId===conv.id?'#E8F0FE':'transparent'"
+            @mouseenter="$event.currentTarget.style.background=currentConvId===conv.id?'#E8F0FE':'#F0F1F5'"
+            @mouseleave="$event.currentTarget.style.background=currentConvId===conv.id?'#E8F0FE':'transparent'"
           >
             <div style="flex:1;overflow:hidden">
               <div style="font-size:13px;color:#1C1F23;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ conv.title }}</div>
@@ -322,9 +357,9 @@ const ChatPage = {
       </div>
 
       <!-- 右侧对话区域 -->
-      <div style="flex:1;display:flex;flex-direction:column;background:#fff">
+      <div style="flex:1;display:flex;flex-direction:column;background:#fff;overflow:hidden">
         <!-- 顶部栏：模型选择 -->
-        <div style="padding:10px 16px;border-bottom:1px solid #E6E8EA;display:flex;align-items:center;gap:12px">
+        <div style="padding:10px 16px;border-bottom:1px solid #E6E8EA;display:flex;align-items:center;gap:12px;flex-shrink:0">
           <span style="font-size:12px;color:#888D92">模型：</span>
           <el-select v-model="activeProvider" size="small" style="width:140px">
             <el-option v-for="(p, name) in providers" :key="name" :label="name" :value="name" />
@@ -335,12 +370,12 @@ const ChatPage = {
         </div>
 
         <!-- 消息列表 -->
-        <div id="chat-messages" style="flex:1;overflow-y:auto;padding:16px 24px">
+        <div id="chat-messages" style="flex:1;overflow-y:auto;padding:16px 24px;min-height:0">
           <!-- 空状态 -->
           <div v-if="currentMessages.length===0" style="height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#888D92">
             <div style="font-size:48px;margin-bottom:16px"><i data-lucide="sparkles" style="width:48px;height:48px;color:#3370FF"></i></div>
             <div style="font-size:18px;font-weight:600;color:#1C1F23;margin-bottom:8px">AI 对话</div>
-            <div style="font-size:14px">输入消息开始对话，支持 Markdown、代码高亮</div>
+            <div style="font-size:14px">输入消息开始对话，支持 Markdown、代码高亮、飞书工具调用</div>
           </div>
 
           <!-- 消息列表 -->
@@ -366,8 +401,8 @@ const ChatPage = {
                 <i data-lucide="check-circle" style="width:14px;height:14px;color:#2E7D32"></i>
                 <span style="font-weight:600;color:#1B5E20">完成：{{ msg.toolLabel }}</span>
               </div>
-              <div style="color:#33691E;font-size:12px;max-height:100px;overflow-y:auto">
-                {{ typeof msg.result === 'object' ? JSON.stringify(msg.result).substring(0, 200) : msg.result }}
+              <div style="color:#33691E;font-size:12px;max-height:150px;overflow-y:auto;white-space:pre-wrap;line-height:1.5">
+                {{ msg.resultSummary || (typeof msg.result === 'object' ? JSON.stringify(msg.result).substring(0, 200) : msg.result) }}
               </div>
             </div>
             <!-- AI 消息 -->
@@ -383,25 +418,28 @@ const ChatPage = {
         </div>
 
         <!-- 输入区域 -->
-        <div style="padding:16px 24px 20px;border-top:2px solid #E6E8EA;background:#FAFBFC">
-          <div style="display:flex;gap:12px;align-items:flex-start;max-width:900px;margin:0 auto">
+        <div style="padding:12px 24px 16px;border-top:2px solid #E6E8EA;background:#FAFBFC;flex-shrink:0">
+          <div style="display:flex;gap:10px;align-items:stretch;max-width:900px;margin:0 auto">
             <el-input
               v-model="inputText"
               type="textarea"
-              :rows="3"
-              :autosize="{ minRows: 2, maxRows: 8 }"
+              :rows="2"
+              :autosize="{ minRows: 2, maxRows: 6 }"
               placeholder="输入消息与 AI 对话... (Enter 发送, Shift+Enter 换行)"
               :disabled="streaming"
               @keydown.enter.exact.prevent="sendMessage"
               style="flex:1"
             />
-            <el-button type="primary" size="large" :loading="streaming" @click="sendMessage" :disabled="!inputText.trim()" style="height:76px;min-width:80px;font-size:15px">
-              <i v-if="!streaming" data-lucide="send" style="width:18px;height:18px"></i>
-              <span v-if="streaming">发送中</span>
+            <el-button v-if="streaming" type="danger" size="large" @click="stopStreaming" style="min-width:70px;font-size:14px">
+              <i data-lucide="square" style="width:14px;height:14px;margin-right:4px"></i> 停止
+            </el-button>
+            <el-button v-else type="primary" size="large" @click="sendMessage" :disabled="!inputText.trim()" style="min-width:70px;font-size:14px">
+              <i data-lucide="send" style="width:16px;height:16px"></i>
             </el-button>
           </div>
         </div>
       </div>
+
     </div>
   `
 };
