@@ -39,12 +39,24 @@ const WBFeishu = {
     }
   },
 
-  // 触发飞书登录（会打开浏览器进行OAuth）
+  // 触发飞书登录（Device Flow：获取验证URL，浏览器已自动打开）
   async login() {
-    const res = await this.request('/auth/login', { method: 'POST' });
-    // 清除缓存，下次检查重新获取状态
+    return this.request('/auth/login', { method: 'POST' });
+  },
+
+  // 轮询登录状态（等待用户在浏览器完成授权）
+  async loginPoll(deviceCode) {
+    return this.request('/auth/login/poll', {
+      method: 'POST',
+      body: JSON.stringify({ deviceCode })
+    });
+  },
+
+  // 退出飞书登录
+  async logout() {
+    const res = await this.request('/auth/logout', { method: 'POST' });
     this.lastCheck = 0;
-    this.connected = true;
+    this.connected = false;
     return res;
   },
 

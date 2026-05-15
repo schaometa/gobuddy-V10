@@ -1,6 +1,6 @@
 // GoBuddy Local API Server - 飞书CLI桥接服务
 const express = require('express');
-const { exec } = require('child_process');
+const { exec, spawn } = require('child_process');
 const cors = require('cors');
 const path = require('path');
 const crypto = require('crypto');
@@ -160,18 +160,112 @@ function unwrap(result) {
 app.get('/api/feishu/auth/status', async (req, res) => {
   try {
     const result = await runLark('lark-cli auth status');
-    res.json({ logged_in: true, ...result });
+    // lark-cli 返回 userName 表示已登录，检查 refreshExpiresAt 是否未过期
+    const loggedIn = result && typeof result === 'object' && result.userName
+      ? !result.refreshExpiresAt || new Date(result.refreshExpiresAt) > new Date()
+      : false;
+    res.json({ logged_in: loggedIn, ...result });
   } catch (e) {
     res.json({ logged_in: false, error: e.message });
   }
 });
 
-app.post('/api/feishu/auth/login', async (req, res) => {
+// 飞书退出登录
+app.post('/api/feishu/auth/logout', async (req, res) => {
   try {
-    const result = await runLark('lark-cli auth login --recommend', 120000);
-    res.json({ success: true, message: '飞书登录成功', ...result });
+    await runLark('lark-cli auth logout');
+    // 清除 auth 缓存（保留 app 配置，避免重装后需要重新配置）
+    const cacheDir = path.join(os.homedir(), '.lark-cli', 'cache');
+    try { fs.rmSync(cacheDir, { recursive: true, force: true }); } catch {}
+    // 清除 config.json 中的用户信息（不删注册表，保留 app secret）
+    const configFile = path.join(os.homedir(), '.lark-cli', 'config.json');
+    try {
+      const cfg = JSON.parse(fs.readFileSync(configFile, 'utf8'));
+      if (cfg.apps) cfg.apps.forEach(a => { a.users = []; });
+      fs.writeFileSync(configFile, JSON.stringify(cfg, null, 2), 'utf8');
+    } catch {}
+    res.json({ success: true });
   } catch (e) {
     res.status(500).json({ error: e.message });
+  }
+});
+
+// 触发飞书登录（Device Flow：获取验证URL + 轮询等待授权）
+app.post('/api/feishu/auth/login', async (req, res) => {
+  try {
+    // 检查 lark-cli 是否已配置，未配置则返回 needConfig
+    try {
+      await runLark('lark-cli auth status');
+    } catch (statusErr) {
+      if (statusErr.message && statusErr.message.includes('not configured')) {
+        return res.json({ success: false, needConfig: true });
+      }
+    }
+    const result = await runLark('lark-cli auth login --recommend --no-wait --json');
+    // 用系统浏览器打开验证链接
+    if (result && result.verification_url) {
+      exec(`start "" "${result.verification_url}"`);
+    }
+    res.json({ success: true, ...result });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// 配置 lark-cli（后台运行 config init，从 stdout 提取验证 URL）
+let configInitProcess = null;
+app.post('/api/feishu/config/init', (req, res) => {
+  if (configInitProcess) {
+    return res.json({ success: true, message: '配置已在进行中' });
+  }
+  const proc = spawn('lark-cli', ['config', 'init', '--new', '--app-id', 'cli_aa88322d20b75bc6', '--brand', 'feishu', '--lang', 'zh'], { shell: true });
+  configInitProcess = proc;
+
+  let output = '';
+  let urlSent = false;
+
+  proc.stdout.on('data', (data) => {
+    output += data.toString();
+    const urlMatch = output.match(/(https:\/\/open\.feishu\.cn\/[^\s]+)/);
+    if (urlMatch && !urlSent) {
+      urlSent = true;
+      res.json({ success: true, verification_url: urlMatch[1] });
+    }
+  });
+
+  proc.stderr.on('data', (data) => {
+    output += data.toString();
+    const urlMatch = output.match(/(https:\/\/open\.feishu\.cn\/[^\s]+)/);
+    if (urlMatch && !urlSent) {
+      urlSent = true;
+      res.json({ success: true, verification_url: urlMatch[1] });
+    }
+  });
+
+  proc.on('close', (code) => {
+    configInitProcess = null;
+    if (!urlSent) {
+      res.status(500).json({ error: '配置失败', code });
+    }
+  });
+
+  proc.on('error', (err) => {
+    configInitProcess = null;
+    if (!urlSent) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+});
+
+// 轮询飞书登录状态（等待用户在浏览器完成授权）
+app.post('/api/feishu/auth/login/poll', async (req, res) => {
+  const { deviceCode } = req.body;
+  if (!deviceCode) return res.status(400).json({ error: '缺少 deviceCode' });
+  try {
+    const result = await runLark(`lark-cli auth login --device-code "${deviceCode}" --json`);
+    res.json({ success: true, ...result });
+  } catch (e) {
+    res.status(200).json({ success: false, pending: true, error: e.message });
   }
 });
 

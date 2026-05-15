@@ -319,6 +319,10 @@ const MessagePage = {
     window.addEventListener('feishu-connected', () => {
       feishuConnected.value = true;
     });
+    // 监听飞书断开连接事件
+    window.addEventListener('feishu-disconnected', () => {
+      feishuConnected.value = false;
+    });
 
     // 页面加载时恢复当前 Tab 缓存 + 检查连接
     onMounted(async () => {

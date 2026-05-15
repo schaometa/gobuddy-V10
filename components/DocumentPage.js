@@ -695,6 +695,10 @@ ${content}
     window.addEventListener('feishu-connected', () => {
       feishuConnected.value = true;
     });
+    // 监听飞书断开连接事件
+    window.addEventListener('feishu-disconnected', () => {
+      feishuConnected.value = false;
+    });
 
     // 监听数据刷新事件（AI 创建文档后同步）
     const onDashboardRefreshed = () => { loadRecentDocs(); };

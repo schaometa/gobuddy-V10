@@ -56,3 +56,24 @@
     DetailPrint "飞书 CLI 已安装"
   ${EndIf}
 !macroend
+
+!macro customUnInstall
+  ; 在 app 终止检查之后运行，确保文件未被锁定
+  ; 全部用 PowerShell 执行，彻底避免 NSIS 多用户模式下路径解析错误
+  DetailPrint "清除用户数据 ..."
+  nsExec::ExecToStack 'powershell -NoProfile -Command "$$u=$$env:USERPROFILE; $$a=$$env:APPDATA; $$l=$$env:LOCALAPPDATA; if(Test-Path \"$$u\\.lark-cli\\cache\"){Remove-Item \"$$u\\.lark-cli\\cache\" -Recurse -Force}; if(Test-Path \"$$u\\.gobuddy-jira.json\"){Remove-Item \"$$u\\.gobuddy-jira.json\" -Force}; if(Test-Path \"$$u\\.gobuddy\"){Remove-Item \"$$u\\.gobuddy\" -Recurse -Force}; if(Test-Path \"$$a\\gobuddy\"){Remove-Item \"$$a\\gobuddy\" -Recurse -Force}; if(Test-Path \"$$l\\gobuddy-updater\"){Remove-Item \"$$l\\gobuddy-updater\" -Recurse -Force}; if(Test-Path \"$$env:TEMP\\gobuddy-*\"){Remove-Item \"$$env:TEMP\\gobuddy-*\" -Force}"'
+  Pop $3
+
+  ; 清除 config.json 中的用户信息（否则 lark-cli 仍认为已登录）
+  ; 注意：不删除注册表 HKCU\SOFTWARE\LarkCli\keychain\lark-cli，因为其中包含 app secret
+  DetailPrint "清除飞书用户配置 ..."
+  nsExec::ExecToStack 'powershell -NoProfile -Command "$$c=\"$$env:USERPROFILE\\.lark-cli\\config.json\"; if(Test-Path $$c){ $$j=Get-Content $$c -Raw -Encoding UTF8 | ConvertFrom-Json; if($$j.apps){ foreach($$a in $$j.apps){ $$a.users=@() } }; $$j | ConvertTo-Json -Depth 20 | Set-Content $$c -Encoding UTF8 }"'
+  Pop $3
+
+  ; 清除 .claude.json 中的 JIRA MCP 配置（含 Cookie/Token）
+  DetailPrint "清除 JIRA MCP 配置 ..."
+  nsExec::ExecToStack 'powershell -NoProfile -Command "$$p=\"$$env:USERPROFILE\.claude.json\"; if(Test-Path $$p){ $$d=Get-Content $$p -Raw -Encoding UTF8 | ConvertFrom-Json; if($$d.mcpServers){ $$d.mcpServers.PSObject.Properties.Remove(''mcp-atlassian-jira-phone''); $$d.mcpServers.PSObject.Properties.Remove(''mcp-atlassian-jiran''); $$d | ConvertTo-Json -Depth 20 | Set-Content $$p -Encoding UTF8 } }"'
+  Pop $3
+
+  DetailPrint "用户数据已清除"
+!macroend
